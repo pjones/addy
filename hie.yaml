@@ -1,0 +1,6 @@
+cradle:
+  cabal:
+    - path: "./"
+      component: "lib:addy"
+    - path: "./test"
+      component: "test:test"

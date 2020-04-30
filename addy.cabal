@@ -1,0 +1,91 @@
+cabal-version: 2.2
+
+--------------------------------------------------------------------------------
+name:          addy
+version:       0.1.0.0
+synopsis:      Modern email parsing and validating
+license:       BSD-2-Clause
+license-file:  LICENSE
+author:        Peter Jones <pjones@devalot.com>
+maintainer:    Peter Jones <pjones@devalot.com>
+copyright:     Copyright (c) 2019-2020 Peter Jones
+category:      Text
+tested-with:   GHC == 8.6.5
+build-type:    Simple
+description:   Parse and validate email addresses, even modern ones with Unicode characters.
+
+--------------------------------------------------------------------------------
+extra-source-files:
+  README.md
+  CHANGES.md
+  test/isemail.json
+  test/README.md
+
+--------------------------------------------------------------------------------
+common options
+  default-language: Haskell2010
+
+  default-extensions:
+    DeriveAnyClass
+    DeriveFoldable
+    DeriveFunctor
+    DeriveGeneric
+    DeriveTraversable
+    DerivingVia
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    NumericUnderscores
+    OverloadedStrings
+    RankNTypes
+    RecordWildCards
+    ScopedTypeVariables
+    StandaloneDeriving
+    TupleSections
+
+  ghc-options:
+    -Wall
+    -Wno-name-shadowing
+    -Werror=incomplete-record-updates
+    -Werror=incomplete-uni-patterns
+    -Werror=missing-home-modules
+    -Widentities
+    -Wmissing-export-lists
+    -Wredundant-constraints
+
+--------------------------------------------------------------------------------
+common dependencies
+  build-depends:
+    attoparsec >= 0.13 && < 0.14,
+    base >= 4.9 && < 5.0,
+    ip >= 1.4 && < 1.8,
+    relude >= 0.6 && < 0.7,
+    text >= 1.2 && < 1.3,
+    text-icu >= 0.7 && < 0.8
+
+  mixins: base hiding (Prelude)
+        , relude (Relude as Prelude)
+
+--------------------------------------------------------------------------------
+library
+  import: options, dependencies
+  hs-source-dirs: src
+  exposed-modules:
+    Addy.Internal.Parser
+    Addy.Internal.Types
+
+--------------------------------------------------------------------------------
+test-suite test
+  import: options, dependencies
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  other-modules:
+    ParserTest
+  build-depends:
+    aeson >= 1.4,
+    addy,
+    http-types >= 0.12,
+    tasty >= 1.1 && < 1.3,
+    tasty-hunit >= 0.10 && < 0.11
