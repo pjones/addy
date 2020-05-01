@@ -18,6 +18,7 @@ module Main
 where
 
 import qualified ParserTest
+import qualified RenderTest
 import Test.Tasty
 
 -- | Main.
@@ -26,5 +27,6 @@ main =
   defaultMain $
     testGroup
       "Email"
-      [ ParserTest.test
+      [ ParserTest.test,
+        RenderTest.test
       ]

@@ -13,7 +13,8 @@
 --
 -- License: BSD-2-Clause
 module Addy.Internal.Parser
-  ( parse,
+  ( Mode (..),
+    parse,
     nameAddr,
     addrSpec,
     localPart,
@@ -38,6 +39,13 @@ import qualified Data.Text as Text
 import qualified Net.IP as IP
 import qualified Net.IPv4 as IP4
 import qualified Net.IPv6 as IP6
+import Relude.Extra.Lens
+
+-- |
+data Mode
+  = Strict
+  | Lenient
+  deriving (Eq, Show)
 
 -- | An email address parser.
 --
@@ -82,13 +90,13 @@ localPart mode = go <?> "local part"
       case mode of
         Strict ->
           (LocalAtom <$> dotAtomLh <* thenAt)
-            <|> (LocalQuoted <$> quotedLh <* thenAt)
+            <|> (LocalAtom <$> quotedLh <* thenAt)
         Lenient ->
           -- Obsolete comes before quoted since the obsolete syntax allows
           -- multiple quoted strings separated by dots.
           (LocalAtom <$> dotAtom mode <* thenAt)
             <|> obsLocalPart <* thenAt
-            <|> (LocalQuoted <$> quoted mode <* thenAt)
+            <|> (LocalAtom <$> quoted mode <* thenAt)
     -- > obs-local-part = word *("." word)
     obsLocalPart :: Atto.Parser LocalPart
     obsLocalPart = do
@@ -119,19 +127,20 @@ domain mode = do
             <|> (DomainAtom <$> dotAtom mode)
             <|> domainLiteral (cfws mode)
     check = \case
-      DomainAtom atom -> traverse_ (traverse_ checkText . Text.splitOn ".") atom
-      DomainLiteral _ -> pass
-      DomainObsolete atoms -> traverse_ (traverse_ checkText) atoms
-    checkText text =
-      if "-" `Text.isPrefixOf` text || "-" `Text.isSuffixOf` text
+      DomainAtom atom -> traverse_ (traverse_ checkLabel . (^. dots)) atom
+      DomainLiteral {} -> pass
+      DomainObsolete atoms -> traverse_ (traverse_ checkLabel) atoms
+    checkLabel label =
+      if "-" `Text.isPrefixOf` (label ^. text)
+        || "-" `Text.isSuffixOf` (label ^. text)
         then fail "must not start or end with a hypen"
         else pass
     -- > domain-literal  =   [CFWS] "[" *([FWS] dtext) [FWS] "]" [CFWS]
     domainLiteral lh = do
-      _ <- optional lh
+      _ <- optional lh -- Don't capture because it's obsolete.
       t <- addressLiteral mode
-      _ <- optional (cfws mode)
-      pure (DomainLiteral t)
+      cs <- optional (cfws mode)
+      pure (DomainLiteral t cs)
     -- > obs-domain = atom *("." atom)
     obsDomain = do
       t0 <- atom mode
@@ -178,23 +187,23 @@ atom :: Mode -> Atto.Parser Atom
 atom mode =
   Atom
     <$> optional (cfws mode)
-    <*> Atto.takeWhile1 (atext mode)
+    <*> atext mode
     <*> optional (cfws mode)
 
 -- | Parse an unquoted atom that is allowed to contain periods.
 --
 -- @since 0.1.0.0
 dotAtom' ::
-  Atto.Parser Comment ->
-  Atto.Parser Comment ->
+  Atto.Parser Comments ->
+  Atto.Parser Comments ->
   Mode ->
   Atto.Parser Atom
 dotAtom' lh rh mode = do
   c0 <- optional lh
-  t0 <- Atto.takeWhile1 (atext mode)
-  ts <- many (Atto.char '.' *> Atto.takeWhile1 (atext mode))
+  t0 <- atext mode
+  ts <- many (Atto.char '.' *> atext mode)
   c1 <- optional rh
-  pure (Atom c0 (Text.intercalate "." (t0 : ts)) c1)
+  pure (Atom c0 (t0 & dots .~ (t0 : ts)) c1)
 
 -- | RFC 5322 @dot-atom@.
 dotAtom :: Mode -> Atto.Parser Atom
@@ -206,7 +215,11 @@ dotAtom mode = dotAtom' (cfws mode) (cfws mode) mode
 --
 -- @since 0.1.0.0
 dotAtomLh :: Atto.Parser Atom
-dotAtomLh = dotAtom' (cfws Strict) (fws Strict) Strict
+dotAtomLh =
+  dotAtom'
+    (cfws Strict)
+    (FoldingSpace <$> fws Strict)
+    Strict
 
 -- | Strict @dot-atom-rh@ from RFC 5322 errata.
 --
@@ -214,7 +227,11 @@ dotAtomLh = dotAtom' (cfws Strict) (fws Strict) Strict
 --
 -- @since 0.1.0.0
 dotAtomRh :: Atto.Parser Atom
-dotAtomRh = dotAtom' (fws Strict) (cfws Strict) Strict
+dotAtomRh =
+  dotAtom'
+    (FoldingSpace <$> fws Strict)
+    (cfws Strict)
+    Strict
 
 -- | Is a character allowed in an atom?
 --
@@ -235,16 +252,19 @@ dotAtomRh = dotAtom' (fws Strict) (cfws Strict) Strict
 --  RFC 6532 §3.2
 --
 -- > atext =/  UTF8-non-ascii
-atext :: Mode -> Char -> Bool
+atext :: Mode -> Atto.Parser Content
 atext = \case
   Strict ->
-    atext'
+    Atto.takeWhile1 atext'
+      <&> CleanText
   Lenient ->
-    \c ->
+    Atto.takeWhile1 obs
+      <&> ObsText
+  where
+    obs c =
       atext' c
         || c == ' '
         || c == '\t'
-  where
     atext' c =
       isAlphaNum c
         || utf8NonAscii c
@@ -294,56 +314,71 @@ quoted mode = quoted' (cfws mode) (cfws mode) mode
 
 -- | General-purpose quoted-string parser.
 quoted' ::
-  Atto.Parser Comment ->
-  Atto.Parser Comment ->
+  Atto.Parser Comments ->
+  Atto.Parser Comments ->
   Mode ->
   Atto.Parser Atom
 quoted' lh rh mode = (<?> "quoted content") $ do
   c0 <- optional lh
   _ <- Atto.char '"'
-  t <- many (optional (fws mode) *> qcontent <* optional (fws mode))
+  t <- many ((<>) <$> fws' <*> qcontent)
+  w <- fws'
   _ <- Atto.char '"'
   c1 <- optional rh
-  pure (AtomQuoted c0 (mconcat t) c1)
+  pure (AtomQuoted c0 (mconcat t <> w) c1)
   where
     -- Characters that are allowed in the quotes:
     qcontent = qtext <|> quotedPair mode
     qtext = case mode of
-      Strict -> Atto.takeWhile1 isqtext
+      Strict -> Atto.takeWhile1 isqtext <&> CleanText
       Lenient ->
         Atto.takeWhile1
           (\c -> isqtext c || obsNoWsCtl c)
+          <&> ObsText
     isqtext c = isasciiqtext (ord c) || utf8NonAscii c
     isasciiqtext n =
       n == 33
         || (n >= 35 && n <= 91)
         || (n >= 93 && n <= 126)
+    fws' = fws mode <|> pure mempty
 
 -- | Strict @quoted-string-lh@ from RFC 5322 errata.
 --
 -- @since 0.1.0.0
 quotedLh :: Atto.Parser Atom
-quotedLh = quoted' (cfws Strict) (fws Strict) Strict
+quotedLh =
+  quoted'
+    (cfws Strict)
+    (FoldingSpace <$> fws Strict)
+    Strict
 
 -- | Parse backslash escapes:
 --
 -- > quoted-pair     =   ("\" (VCHAR / WSP)) / obs-qp
 --
 -- > obs-qp          =   "\" (%d0 / obs-NO-WS-CTL / LF / CR)
-quotedPair :: Mode -> Atto.Parser Text
+quotedPair :: Mode -> Atto.Parser Content
 quotedPair mode = go <?> "quoted char"
   where
-    go = one <$> (Atto.char '\\' *> Atto.satisfy allowed)
-    allowed c = case mode of
+    go = Atto.char '\\' *> allowed
+    allowed = case mode of
       Strict ->
-        vchar c || wsp c
+        Atto.satisfy
+          ( \c ->
+              vchar c || wsp c
+          )
+          <&> (one >>> CleanText)
       Lenient ->
-        vchar c
-          || wsp c
-          || obsNoWsCtl c
-          || c == '\r'
-          || c == '\n'
-          || c == '\0'
+        Atto.satisfy
+          ( \c ->
+              vchar c
+                || wsp c
+                || obsNoWsCtl c
+                || c == '\r'
+                || c == '\n'
+                || c == '\0'
+          )
+          <&> (one >>> ObsText)
 
 -- | Comments and folding white space.
 --
@@ -361,30 +396,35 @@ quotedPair mode = go <?> "quoted char"
 -- > CFWS            =   (1*([FWS] comment) [FWS]) / FWS
 --
 -- @since 0.1.0.0
-cfws :: Mode -> Atto.Parser Comment
+cfws :: Mode -> Atto.Parser Comments
 cfws mode =
-  (<?> "comment or space") $
-    (Comment . mconcat <$> Atto.many1 cfws')
-      <|> fws mode
+  (<?> "comment or space")
+    (cfws' <|> (FoldingSpace <$> fws mode))
   where
     cfws' = do
-      f0 <- fromMaybe Text.empty <$> optional fws'
-      c0 <- comment
-      f1 <- fromMaybe Text.empty <$> optional fws'
-      pure (f0 <> c0 <> f1)
-    comment :: Atto.Parser Text
+      c : cs <- Atto.many1 ((,) <$> optional fws' <*> comment)
+      fs <- optional fws'
+      pure (Comments (c :| cs) fs)
+    comment :: Atto.Parser Comment
     comment = do
       _ <- Atto.char '('
-      ts <- many $ do
-        f0 <- fws' <|> pure Text.empty
-        cs <- mconcat <$> Atto.many1 ccontent
-        pure (f0 <> cs)
-      f1 <- fws' <|> pure Text.empty
+      ts <-
+        many
+          ( (<>) <$> (fws' <|> pure mempty)
+              <*> (mconcat <$> Atto.many1 ccontent)
+          )
+      fs <- optional fws'
       _ <- Atto.char ')'
-      pure (mconcat ts <> f1)
-    ccontent :: Atto.Parser Text
-    ccontent = ctext <|> quotedPair mode <|> comment
-    ctext :: Atto.Parser Text
+      pure (Comment (mconcat ts) fs)
+    ccontent :: Atto.Parser Content
+    ccontent =
+      ctext
+        <|> quotedPair mode
+        <|> ( do
+                Comment t0 t1 <- comment
+                pure (t0 <> fromMaybe mempty t1)
+            )
+    ctext :: Atto.Parser Content
     ctext =
       let isctext c = isasciictext (ord c) || utf8NonAscii c
           isasciictext n =
@@ -393,14 +433,13 @@ cfws mode =
               || (n >= 93 && n <= 126)
        in case mode of
             Strict ->
-              Atto.takeWhile1 isctext
+              Atto.takeWhile1 isctext <&> CleanText
             Lenient ->
               Atto.takeWhile1
                 (\c -> isctext c || obsNoWsCtl c)
-    fws' :: Atto.Parser Text
-    fws' = fws mode >>= \case
-      Comment t -> pure t
-      FoldableSpace t -> pure t
+                <&> ObsText
+    fws' :: Atto.Parser Content
+    fws' = fws mode
 
 -- | Folding white space.
 --
@@ -410,22 +449,17 @@ cfws mode =
 -- > obs-FWS         =   1*WSP *(CRLF 1*WSP)
 --
 -- @since 0.1.0.0
-fws :: Mode -> Atto.Parser Comment
+fws :: Mode -> Atto.Parser Content
 fws = \case
   Strict -> do
-    w0 <- fmap (fromMaybe Text.empty) $ optional $ do
-      c0 <- many (Atto.satisfy wsp) <&> map one
-      cs <- crlf
-      pure (mconcat c0 <> cs)
+    w0 <- (Atto.takeWhile wsp <* crlf) <|> pure Text.empty
     w1 <- Atto.takeWhile1 wsp
-    pure (FoldableSpace (w0 <> w1))
+    pure $ CleanText (w0 <> w1)
   Lenient -> do
     w0 <- Atto.takeWhile1 wsp
-    ws <- many $ do
-      c0 <- crlf
-      cs <- Atto.takeWhile1 wsp
-      pure (c0 <> cs)
-    pure (FoldableSpace (w0 <> mconcat ws))
+    ws <- many (crlf *> Atto.takeWhile1 wsp)
+    -- Text here is clean because we strip out the control characters.
+    pure $ CleanText (w0 <> mconcat ws)
   where
     crlf = Atto.string "\r\n"
 
@@ -482,10 +516,9 @@ addressLiteral mode =
     $ map
       wrap
       [ IpAddress . IP.fromIPv6 <$> (Atto.string "IPv6:" *> IP6.parser),
-        TaggedAddress <$> Atto.takeWhile1 (\c -> c /= ':' && isdtext c)
-          <*> dtext,
+        TaggedAddress <$> tag <*> (Atto.char ':' *> dtext),
         IpAddress . IP.fromIPv4 <$> IP4.parser,
-        AddressLiteral . mconcat <$> many (optional (fws mode) *> dtext)
+        AddressLiteral . mconcat <$> many ((<>) <$> fws' <*> dtext)
       ]
   where
     wrap p =
@@ -493,14 +526,18 @@ addressLiteral mode =
         *> p
         <* optional (fws mode)
         <* Atto.char ']'
+    tag = Atto.takeWhile1 (\c -> c /= ':' && isdtext c) <&> CleanText
     dtext =
       case mode of
         Strict ->
           Atto.takeWhile1 isdtext
+            <&> CleanText
         Lenient ->
           mconcat
             <$> Atto.many1
-              ( Atto.takeWhile1 (\c -> isdtext c || obsNoWsCtl c)
+              ( ( Atto.takeWhile1 (\c -> isdtext c || obsNoWsCtl c)
+                    <&> ObsText
+                )
                   <|> quotedPair mode
               )
     isdtext c = asciidtext (ord c) || utf8NonAscii c
@@ -508,3 +545,4 @@ addressLiteral mode =
         asciidtext n =
           (n >= 33 && n <= 90)
             || (n >= 94 && n <= 126)
+    fws' = fws mode <|> pure mempty

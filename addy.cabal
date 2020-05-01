@@ -65,7 +65,7 @@ common dependencies
     text-icu >= 0.7 && < 0.8
 
   mixins: base hiding (Prelude)
-        , relude (Relude as Prelude)
+        , relude (Relude as Prelude, Relude.Extra.Lens)
 
 --------------------------------------------------------------------------------
 library
@@ -73,6 +73,7 @@ library
   hs-source-dirs: src
   exposed-modules:
     Addy.Internal.Parser
+    Addy.Internal.Render
     Addy.Internal.Types
 
 --------------------------------------------------------------------------------
@@ -83,6 +84,8 @@ test-suite test
   main-is: Main.hs
   other-modules:
     ParserTest
+    RenderTest
+    TestData
   build-depends:
     aeson >= 1.4,
     addy,
