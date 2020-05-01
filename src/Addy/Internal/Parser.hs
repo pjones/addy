@@ -28,6 +28,7 @@ module Addy.Internal.Parser
     quoted,
     quotedLh,
     cfws,
+    utf8NonAscii,
   )
 where
 

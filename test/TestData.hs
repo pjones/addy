@@ -19,12 +19,20 @@ module TestData
     rfc5322Examples,
     rfc5322ObsExamples,
     wikipediaIntExamples,
+    miscExamples,
+    genShortEmail,
+    genLongEmail,
   )
 where
 
-import qualified Data.Aeson as Aeson
+import Addy.Internal.Parser (utf8NonAscii)
 import Data.Aeson (FromJSON)
+import qualified Data.Aeson as Aeson
+import Data.Char
 import qualified Data.Text as Text
+import Hedgehog
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 import Network.HTTP.Types.URI (urlDecode)
 import Test.Tasty.HUnit
 
@@ -136,3 +144,65 @@ wikipediaIntExamples =
     "медведь@с-балалайкой.рф",
     "संपर्क@डाटामेल.भारत"
   ]
+
+-- | Other examples that should pass.
+--
+-- > (source, simple-format)
+miscExamples :: [(Text, Text)]
+miscExamples =
+  [ ("example+label@example.com", "example+label@example.com"),
+    ("a@b", "a@b")
+  ]
+
+genLocalPart :: Gen Text
+genLocalPart =
+  Gen.filter okay (Gen.text (Range.linear 1 64) unicode)
+  where
+    okay :: Text -> Bool
+    okay t =
+      Text.all allowedChar t
+        && not (Text.isPrefixOf "." t)
+        && not (Text.isSuffixOf "." t)
+
+genDomain :: Gen Text
+genDomain =
+  Gen.filter okay (Gen.text (Range.linear 1 254) unicode)
+  where
+    okay :: Text -> Bool
+    okay t =
+      Text.all allowedChar t
+        && not (Text.isPrefixOf "-" t)
+        && not (Text.isSuffixOf "-" t)
+
+genShortEmail :: Gen Text
+genShortEmail = do
+  localPart <- genLocalPart
+  domain <- genDomain
+  pure (localPart <> "@" <> domain)
+
+genLongEmail :: Gen Text
+genLongEmail = do
+  display <- Gen.text (Range.linear 1 25) unicode
+  localPart <- genLocalPart
+  domain <- genDomain
+  pure $
+    mconcat
+      [ display,
+        " <",
+        localPart,
+        "@",
+        domain,
+        ">"
+      ]
+
+allowedChar :: Char -> Bool
+allowedChar c = isAscii c || utf8NonAscii c
+
+-- | Modified 'unicode' generator from Hedgehog.
+unicode :: Gen Char
+unicode =
+  Gen.frequency
+    [ (55296, Gen.element "!#$%&'*+-/=?^_`{|}~"),
+      (55296, Gen.alphaNum),
+      (8190, Gen.filter isPrint (Gen.enum (chr 0xc2) maxBound))
+    ]

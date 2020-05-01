@@ -20,8 +20,10 @@ where
 import Addy.Internal.Parser as P
 import Addy.Internal.Types
 import qualified Data.Attoparsec.Text as Atto
+import qualified Hedgehog
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
+import Test.Tasty.Hedgehog
 import TestData
 
 test :: TestTree
@@ -30,7 +32,14 @@ test =
     "Parser"
     [ testCase "isemail tests" testParserWithIsEmail,
       testCase "RFC 5322 examples" testRfc5322Examples,
-      testCase "Wikipedia internationalization examples" testWikipediaIntExamples
+      testCase "Wikipedia internationalization examples" testWikipediaIntExamples,
+      testCase "Miscellaneous examples" testMiscExamples,
+      testProperty
+        "Generated short addresses"
+        (testGeneratedExamples genShortEmail),
+      testProperty
+        "Generated long addresses"
+        (testGeneratedExamples genLongEmail)
     ]
 
 testRfc5322Examples :: Assertion
@@ -51,6 +60,23 @@ testWikipediaIntExamples =
     go t = do
       assertParse Strict t
       assertParse Lenient t
+
+testMiscExamples :: Assertion
+testMiscExamples =
+  forM_ miscExamples $
+    fst >>> \t -> do
+      assertParse Strict t
+      assertParse Lenient t
+
+testGeneratedExamples :: Hedgehog.Gen Text -> Hedgehog.Property
+testGeneratedExamples gen =
+  Hedgehog.property $ do
+    source <- Hedgehog.forAll gen
+    let result = runParse source
+    Hedgehog.annotateShow result
+    Hedgehog.assert (isRight result)
+  where
+    runParse = Atto.parseOnly (P.parse Strict <* Atto.endOfInput)
 
 assertParse :: Mode -> Text -> Assertion
 assertParse mode text =
