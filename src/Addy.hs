@@ -25,6 +25,7 @@ module Addy
     -- * Email addresses
     EmailAddr,
     emailAddr,
+    emailAddrLit,
     displayName,
     localPart,
     domain,
@@ -113,11 +114,17 @@ encode = R.renderToText R.Short
 encodeFull :: EmailAddr -> Text
 encodeFull = R.renderToText R.Full
 
--- | Build an 'EmailAddr' from a 'LocalPart' and 'Domain'.
+-- | Build an 'EmailAddr' from a 'LocalPart' and 'DomainName'.
 --
 -- @since 0.1.0.0
-emailAddr :: LocalPart -> Domain -> EmailAddr
-emailAddr l d = EmailAddr Nothing l d []
+emailAddr :: LocalPart -> DomainName -> EmailAddr
+emailAddr l d = EmailAddr Nothing l (Domain d) []
+
+-- | Build an 'EmailAddr' from a 'LocalPart' and an 'AddressLiteral'.
+--
+-- @since 0.1.0.0
+emailAddrLit :: LocalPart -> AddressLiteral -> EmailAddr
+emailAddrLit l d = EmailAddr Nothing l (DomainLiteral d) []
 
 -- | Prism for working with display names.
 --
@@ -350,8 +357,8 @@ _CommentContent =
 --
 -- >>> :{
 --  Addy.emailAddr
---    <$> "pjones" ^? Addy_LocalPart
---    <*> "devalot.com" ^? Addy._DomainName.re Addy_Domain
+--    <$> "pjones" ^? Addy._LocalPart
+--    <*> "devalot.com" ^? Addy._DomainName
 -- :}
 -- > Just (EmailAddr {
 -- >   displayName = Nothing,
@@ -367,7 +374,7 @@ _CommentContent =
 -- >>> :{
 --  Addy.emailAddr
 --    <$> Addy.validateLocalPart "pjones"
---    <*> (Addy.Domain <$> Addy.validateDomainName "devalot.com")
+--    <*> Addy.validateDomainName "devalot.com"
 -- :}
 -- Success (EmailAddr {
 --   displayName = Nothing,
