@@ -46,5 +46,17 @@
         "type": "tarball",
         "url": "https://github.com/tweag/ormolu/archive/3fbc130a0962ab236d87711beae1895d84a68362.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "validation-selective": {
+        "branch": "master",
+        "description": "💂‍♂️ Lightweight pure validation based on Applicative and Selective functors",
+        "homepage": "https://kowainik.github.io/projects/validation-selective",
+        "owner": "kowainik",
+        "repo": "validation-selective",
+        "rev": "5b46cd4810bbaa09b704062ebbfa2bb47137425d",
+        "sha256": "0jjf882pq39ly29ikngkiz4zxqwkzv85m2rl37j5gcd0ywg3dcpi",
+        "type": "tarball",
+        "url": "https://github.com/kowainik/validation-selective/archive/5b46cd4810bbaa09b704062ebbfa2bb47137425d.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

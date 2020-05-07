@@ -25,5 +25,11 @@ nix-hs {
       if super ? relude_0_6_0_0
       then super.relude_0_6_0_0
       else super.relude;
+
+      validation-selective =
+        dontCheck (
+          super.callCabal2nix
+          "validation-selective"
+          sources.validation-selective {});
   };
 }

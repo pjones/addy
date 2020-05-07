@@ -19,7 +19,6 @@ where
 
 import Addy.Internal.Parser as P
 import Addy.Internal.Types
-import qualified Data.Attoparsec.Text as Atto
 import qualified Hedgehog
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
@@ -63,10 +62,14 @@ testWikipediaIntExamples =
 
 testMiscExamples :: Assertion
 testMiscExamples =
-  forM_ miscExamples $
-    fst >>> \t -> do
-      assertParse Strict t
-      assertParse Lenient t
+  forM_ examples $ \t -> do
+    assertParse Strict t
+    assertParse Lenient t
+  where
+    examples =
+      miscExamples
+        <> [ "(((((((((())))))))))user@example.org"
+           ]
 
 testGeneratedExamples :: Hedgehog.Gen Text -> Hedgehog.Property
 testGeneratedExamples gen =
@@ -76,11 +79,11 @@ testGeneratedExamples gen =
     Hedgehog.annotateShow result
     Hedgehog.assert (isRight result)
   where
-    runParse = Atto.parseOnly (P.parse Strict <* Atto.endOfInput)
+    runParse = parseWithMode Strict
 
 assertParse :: Mode -> Text -> Assertion
 assertParse mode text =
-  let r = Atto.parseOnly (P.parse mode <* Atto.endOfInput) text
+  let r = parseWithMode mode text
    in assertBool
         (toString text <> " " <> show r <> " " <> show mode)
         (isRight r)
@@ -102,16 +105,16 @@ testParserWithIsEmail = mapM_ go =<< isEmailTests
     shouldPass = expect isRight
     shouldFail = expect isLeft
     expect ::
-      (Either String Email -> Bool) ->
+      (Either (NonEmpty Error) EmailAddr -> Bool) ->
       Mode ->
       IsEmailTest ->
       Assertion
     expect f mode ie =
       let result = runParse mode ie
        in assertBool (report mode ie result) (f result)
-    runParse :: Mode -> IsEmailTest -> Either String Email
-    runParse mode = Atto.parseOnly (P.parse mode <* Atto.endOfInput) . ietAddr
-    report :: Mode -> IsEmailTest -> Either String Email -> String
+    runParse :: Mode -> IsEmailTest -> Either (NonEmpty Error) EmailAddr
+    runParse mode = parseWithMode mode . ietAddr
+    report :: Mode -> IsEmailTest -> Either (NonEmpty Error) EmailAddr -> String
     report mode isemail result =
       mconcat
         [ "IsEmail test id ",

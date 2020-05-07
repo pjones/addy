@@ -25,7 +25,7 @@ module TestData
   )
 where
 
-import Addy.Internal.Parser (utf8NonAscii)
+import Addy.Internal.Char (utf8NonAscii)
 import Data.Aeson (FromJSON)
 import qualified Data.Aeson as Aeson
 import Data.Char
@@ -85,6 +85,13 @@ decodeCat iet = go & override
       "ISEMAIL_DEPREC" -> CatDeprec
       _ -> CatOkay
     override cat
+      -- We enforce character limits so these will fail.
+      | ietId iet == 26 = CatError
+      | ietId iet == 28 = CatError
+      | ietId iet == 41 = CatError
+      -- This is obviously wrong if you put even the slightest amount
+      -- of thought into it.
+      | ietId iet == 43 = CatError
       -- This one is a bit silly.  Even if that form is deprecated
       -- it would then pass under the general @domain-literal@ rule
       -- in RFC 5322 §3.4.1.
@@ -100,6 +107,13 @@ decodeCat iet = go & override
       | ietId iet == 115 = CatDeprec
       | ietId iet == 116 = CatDeprec
       | ietId iet == 117 = CatDeprec
+      -- Obsolete and won't pass validation because they only contain
+      -- obsolete characters!
+      | ietId iet == 124 = CatError
+      | ietId iet == 125 = CatError
+      | ietId iet == 134 = CatError
+      | ietId iet == 138 = CatError
+      | ietId iet == 139 = CatError
       -- Nothing to override.
       | otherwise = cat
 
@@ -127,11 +141,11 @@ rfc5322ObsExamples :: [(Text, Text, Text)]
 rfc5322ObsExamples =
   [ ( "Pete(A nice \\) chap) <pete(his account)@silly.test(his host)>",
       "pete@silly.test",
-      "Pete(A nice \\) chap) <pete@silly.test(his host)>"
+      "Pete (A nice \\) chap) <(his account) pete@silly.test (his host)>"
     ),
     ( "Chris Jones <c@(Chris's host.)public.example>",
       "c@public.example",
-      "Chris Jones <c@public.example>"
+      "Chris Jones <c@public.example (Chris's host.)>"
     )
   ]
 
@@ -148,15 +162,28 @@ wikipediaIntExamples =
 -- | Other examples that should pass.
 --
 -- > (source, simple-format)
-miscExamples :: [(Text, Text)]
+miscExamples :: [Text]
 miscExamples =
-  [ ("example+label@example.com", "example+label@example.com"),
-    ("a@b", "a@b")
+  [ "example+label@example.com",
+    "a@b",
+    "simple@example.com",
+    "very.common@example.com",
+    "disposable.style.email.with+symbol@example.com",
+    "other.email-with-hyphen@example.com",
+    "fully-qualified-domain@example.com",
+    "user.name+tag+sorting@example.com",
+    "x@example.com",
+    "example-indeed@strange-example.com",
+    "admin@mailserver1",
+    "example@s.example",
+    "\"john..doe\"@example.org",
+    "mailhost!username@example.org",
+    "user%example.com@example.org"
   ]
 
 genLocalPart :: Gen Text
 genLocalPart =
-  Gen.filter okay (Gen.text (Range.linear 1 64) unicode)
+  Gen.filter okay (Gen.text (Range.linear 1 30) unicode)
   where
     okay :: Text -> Bool
     okay t =
@@ -166,7 +193,7 @@ genLocalPart =
 
 genDomain :: Gen Text
 genDomain =
-  Gen.filter okay (Gen.text (Range.linear 1 254) unicode)
+  Gen.filter okay (Gen.text (Range.linear 1 50) unicode)
   where
     okay :: Text -> Bool
     okay t =
@@ -182,7 +209,7 @@ genShortEmail = do
 
 genLongEmail :: Gen Text
 genLongEmail = do
-  display <- Gen.text (Range.linear 1 25) unicode
+  display <- genLocalPart
   localPart <- genLocalPart
   domain <- genDomain
   pure $

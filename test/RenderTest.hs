@@ -20,7 +20,8 @@ where
 import qualified Addy.Internal.Parser as Parser
 import Addy.Internal.Render
 import Addy.Internal.Types
-import qualified Data.Attoparsec.Text as Atto
+import Data.Char
+import qualified Data.Text as Text
 import qualified Data.Text.Lazy.Builder as TB
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
@@ -34,7 +35,8 @@ test =
       testCase "RFC 5322 examples" testRfcExamples,
       testCase "Obsolete examples" testObsExamples,
       testCase "Oddities" testOddities,
-      testCase "Wikipedia" testWikipediaExamples
+      testCase "Wikipedia" testWikipediaExamples,
+      testCase "Misc" testMiscExamples
     ]
 
 testRfcExamples :: Assertion
@@ -44,8 +46,14 @@ testRfcExamples =
     go :: (Text, Text) -> Assertion
     go (source, expectS) = do
       (_, actualS, actualF) <- roundTrip Parser.Strict source
+      let expectF =
+            -- We don't render the brackets unless they are needed.
+            if Text.isPrefixOf "<" source
+              && Text.isSuffixOf ">" source
+              then Text.drop 1 (Text.dropEnd 1 source)
+              else source
       actualS @?= expectS
-      actualF @?= source
+      actualF @?= expectF
       idempotentTest actualS actualF
 
 testObsExamples :: Assertion
@@ -76,6 +84,13 @@ testOddities =
       actualS @?= simple
       actualF @?= full
 
+testMiscExamples :: Assertion
+testMiscExamples =
+  forM_ miscExamples $ \source -> do
+    (_, actualS, actualF) <- roundTrip Parser.Strict source
+    actualS @?= source
+    actualF @?= source
+
 testFromisEmailTests :: Assertion
 testFromisEmailTests = do
   tests <- isEmailTests
@@ -84,6 +99,7 @@ testFromisEmailTests = do
     ( filter
         ( \(iet, cat) ->
             cat == CatOkay
+              && ietId iet /= 42 -- Unnecessary quoting.
               && ietId iet /= 45 -- Unnecessary quoting.
               && ietId iet /= 55 -- Unnecessary quoting.
               && ietId iet /= 60 -- Unnecessary quoting.
@@ -102,7 +118,9 @@ testFromisEmailTests = do
     go :: (IsEmailTest, IsEmailCat) -> Assertion
     go (iet, _) = do
       (_, _, actualF) <- roundTrip Parser.Strict (ietAddr iet)
-      actualF @?= ietAddr iet
+      -- Ignore white space changes
+      Text.filter (not . isSpace) actualF
+        @?= Text.filter (not . isSpace) (ietAddr iet)
 
 testWikipediaExamples :: Assertion
 testWikipediaExamples =
@@ -114,14 +132,14 @@ testWikipediaExamples =
       simple @?= source
       full @?= source
 
-roundTrip :: MonadFail m => Parser.Mode -> Text -> m (Email, Text, Text)
+roundTrip :: MonadFail m => Parser.Mode -> Text -> m (EmailAddr, Text, Text)
 roundTrip pmode t =
-  case Atto.parseOnly (Parser.parse pmode <* Atto.endOfInput) t of
-    Left e -> fail (show t <> " " <> e)
+  case Parser.parseWithMode pmode t of
+    Left e -> fail (show t <> " " <> show e)
     Right addr ->
       pure
         ( addr,
-          toStrict $ TB.toLazyText (render Simple addr),
+          toStrict $ TB.toLazyText (render Short addr),
           toStrict $ TB.toLazyText (render Full addr)
         )
 
