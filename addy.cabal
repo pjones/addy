@@ -12,9 +12,18 @@ copyright:     Copyright (c) 2019-2020 Peter Jones
 homepage:      https://github.com/pjones/addy
 bug-reports:   https://github.com/pjones/addy/issues
 category:      Text
-tested-with:   GHC == 8.6.5
+tested-with:   GHC == 8.6.5, GHC == 8.8.3
 build-type:    Simple
-description:   Parse and validate email addresses, even modern ones with Unicode characters.
+description:
+  A modern library for working with email addresses.  This package can
+  be used to validate user input or handle various flavors of
+  addresses that appear in places such as mail messages.
+  .
+  Email addresses can be decoded, manipulated, then rendered back to
+  text using the simple @local-part\@domain@ format or the more
+  complete syntax that allows for display names and comments.
+  .
+  Comprehensive documentation can be found in the "Addy" module.
 
 --------------------------------------------------------------------------------
 extra-source-files:

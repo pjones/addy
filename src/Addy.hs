@@ -111,6 +111,12 @@ decode = P.parseWithMode P.Strict
 -- This is useful for exacting email addresses from mail messages but
 -- should not be used to validate user input.
 --
+-- >>> Addy.decode "my . email . addy@(WTF)example.com"
+-- Left (ParserFailedError "local part > quoted content > '\"': Failed reading: satisfy" :| [])
+--
+-- >>> Addy.decodeLenient "my . email . addy@(WTF)example.com"
+-- Right (EmailAddr "my.email.addy@example.com (WTF)")
+--
 -- @since 0.1.0.0
 decodeLenient :: Text -> Either (NonEmpty Error) EmailAddr
 decodeLenient = P.parseWithMode P.Lenient
@@ -341,6 +347,12 @@ _CommentContent =
 --
 -- >>> Addy.decode "example@[127.0.0.1]"
 -- Right (EmailAddr "example@[127.0.0.1]")
+--
+-- After decoding, an address is automatically normalized by performing
+-- NFC normalization and down-casing the domain name:
+--
+-- >>> Addy.decode "My.Email.Addy@ExAmPlE.COM"
+-- Right (EmailAddr "My.Email.Addy@example.com")
 --
 -- == Encoding addresses
 --
