@@ -20,7 +20,7 @@
     "nix-hs": {
         "ref": "next",
         "repo": "https://code.devalot.com/open/nix-hs.git",
-        "rev": "b267b7dff1e83909e537b5e9af7de0975caf112c",
+        "rev": "1f33abd763e3af77f985222b7732e84be7c9ebb1",
         "type": "git"
     },
     "nixpkgs": {

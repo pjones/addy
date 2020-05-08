@@ -118,9 +118,10 @@ testFromisEmailTests = do
     go :: (IsEmailTest, IsEmailCat) -> Assertion
     go (iet, _) = do
       (_, _, actualF) <- roundTrip Parser.Strict (ietAddr iet)
-      -- Ignore white space changes
-      Text.filter (not . isSpace) actualF
-        @?= Text.filter (not . isSpace) (ietAddr iet)
+      fixup actualF @?= fixup (ietAddr iet)
+    -- Ignore white space changes and revert IPv6 address formatting
+    fixup :: Text -> Text
+    fixup = Text.filter (not . isSpace) . Text.replace ":0:" "::"
 
 testWikipediaExamples :: Assertion
 testWikipediaExamples =
