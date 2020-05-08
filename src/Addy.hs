@@ -12,6 +12,19 @@
 --   contained in the LICENSE file.
 --
 -- License: BSD-2-Clause
+--
+-- Email addressed are complicated, really complicated.  This library
+-- supports all standardized forms of email addresses, including those
+-- with UTF-8 encoded Unicode characters.  The standards used by this
+-- library include:
+--
+--   * RFC 1123: Requirements for Internet Hosts -- Application and Support
+--   * RFC 2181: Clarifications to the DNS Specification
+--   * RFC 3696: Application Techniques for Checking and Transformation of Names
+--   * RFC 5321: Simple Mail Transfer Protocol
+--   * RFC 5322: Internet Message Format
+--   * RFC 6531: SMTP Extension for Internationalized Email
+--   * RFC 6532: Internationalized Email Headers
 module Addy
   ( -- * How to use this library
     -- $use
@@ -95,6 +108,9 @@ decode = P.parseWithMode P.Strict
 -- | Decode an email address, allowing obsolete characters.  The
 -- obsolete characters are parsed but not included in the output.
 --
+-- This is useful for exacting email addresses from mail messages but
+-- should not be used to validate user input.
+--
 -- @since 0.1.0.0
 decodeLenient :: Text -> Either (NonEmpty Error) EmailAddr
 decodeLenient = P.parseWithMode P.Lenient
@@ -132,8 +148,8 @@ emailAddrLit l d = EmailAddr Nothing l (DomainLiteral d) []
 --
 -- To convert text into a 'DisplayName' with content validation:
 --
--- >>> isJust ("Some Text" ^? _DisplayName)
--- True
+-- >>> "Some Text" ^? _DisplayName
+-- Just (DisplayName "Some Text")
 -- >>> "Some\nText" ^? _DisplayName
 -- Nothing -- Validation failed.
 --
@@ -157,8 +173,8 @@ _DisplayName =
 --
 -- To convert text to a 'LocalPart' with content validation:
 --
--- >>> isJust ("cockroach+mouse" ^? _LocalPart)
--- True
+-- >>> "cockroach+mouse" ^? _LocalPart
+-- Just (LocalPart "cockroach+mouse")
 -- >>> "cockroach\nmouse" ^? _LocalPart
 -- Nothing -- Validation failed.
 --
@@ -182,8 +198,8 @@ _LocalPart =
 --
 -- To convert text to a 'DomainName' with validation:
 --
--- >>> isJust ("gmail.com" ^? _DomainName)
--- True
+-- >>> "gmail.com" ^? _DomainName
+-- Just (DomainName "gmail.com")
 -- >>> "too.many.dots." ^? _DomainName
 -- Nothing
 --
@@ -207,8 +223,8 @@ _DomainName =
 --
 -- To convert text to a host name with validation:
 --
--- >>> isJust ("com" ^? _HostName)
--- True
+-- >>> "com" ^? _HostName
+-- Just (HostName "com")
 -- >>> "com." ^? _HostName
 -- Nothing -- Validation failed.
 --
@@ -232,8 +248,8 @@ _HostName =
 --
 -- To convert text to an address tag with validation:
 --
--- >>> isJust ("IPv6" ^? _AddressTag)
--- True
+-- >>> "IPv6" ^? _AddressTag
+-- Just (AddressTag "IPv6")
 -- >>> "[IPv6]" ^? _AddressTag
 -- Nothing -- Validation failed.
 --
@@ -257,8 +273,8 @@ _AddressTag =
 --
 -- To convert text to an address literal with validation:
 --
--- >>> isJust ("127.0.0.1" ^? _Literal)
--- True
+-- >>> "127.0.0.1" ^? _Literal
+-- Just (Literal "127.0.0.1")
 -- >>> "[]" ^? _Literal
 -- Nothing -- Validation failed.
 --
@@ -282,8 +298,8 @@ _Literal =
 --
 -- To convert text to a comment with validation:
 --
--- >>> isJust ("best email" ^? _CommentContent)
--- True
+-- >>> "best email ever" ^? _CommentContent
+-- Just (CommentContent "best email ever")
 -- >>> "\n" ^? _CommentContent
 -- Nothing
 --
@@ -304,44 +320,37 @@ _CommentContent =
 
 -- $use
 --
+-- == Importing
+--
 -- This library is designed to be imported qualified:
 --
 -- > import qualified Addy
 --
--- To decode an email address from text:
+-- == Decoding addresses
+--
+-- To decode (parse) an email address from text:
 --
 -- >>> Addy.decode "example@example.com"
--- Right (EmailAddr {
---   displayName = Nothing,
---   localPart = "example",
---   domain = Domain "example.com",
---   comments = []})
+-- Right (EmailAddr "example@example.com")
 --
 -- >>> Addy.decode "我買@屋企.香港"
--- Right (EmailAddr {
---   displayName = Nothing,
---   localPart = "\25105\36023",
---   domain = Domain "\23627\20225.\39321\28207",
---   comments = []})
+-- Right (EmailAddr "\25105\36023@\23627\20225.\39321\28207")
 --
 -- >>> Addy.decode "Mary Smith <mary@example.net> (hi there!)"
--- Right (EmailAddr {
---   displayName = Just "Mary Smith",
---   localPart = "mary",
---   domain = Domain "example.net",
---   comments = [Comment AfterAddress "hi there!"]})
+-- Right (EmailAddr "Mary Smith <mary@example.net> (hi there!)")
 --
 -- >>> Addy.decode "example@[127.0.0.1]"
--- Right (EmailAddr {
---   displayName = Nothing,
---   localPart = "example",
---   domain = DomainLiteral (IpAddressLiteral (ipv4 127 0 0 1)),
---   comments = []})
+-- Right (EmailAddr "example@[127.0.0.1]")
+--
+-- == Encoding addresses
 --
 -- Turning an email address back to text is just as easy:
 --
 -- >>> Addy.encode address
--- > "example@example.com"
+-- "example@example.com"
+--
+-- If an address has an optional display name or comments you can
+-- render those with the 'encodeFull' function.
 --
 -- >>> :{
 --   Addy.decode "Mary Smith <mary@example.net> (hi there!)"
@@ -349,35 +358,68 @@ _CommentContent =
 -- :}
 -- Right "Mary Smith <mary@example.net> (hi there!)"
 --
--- Lens and prisms are provided to make working with an email address easier:
+-- == Creating addresses
 --
--- > import qualified Addy
--- > import Control.Lens
--- >
+-- In order to prevent invalid email addresses from being created this
+-- library uses @newtype@ wrappers and does not export the data
+-- constructors.  Therefore you'll need to use the smart constructor
+-- approach using the 'emailAddr' function.
 --
--- >>> :{
---  Addy.emailAddr
---    <$> "pjones" ^? Addy._LocalPart
---    <*> "devalot.com" ^? Addy._DomainName
--- :}
--- > Just (EmailAddr {
--- >   displayName = Nothing,
--- >   localPart = "pjones",
--- >   domain = Domain "devalot.com",
--- >   comments = []})
--- >
--- > >>> Addy.decode "example@example.com" ^? _Right.Addy.domain
--- > Just (Domain "example.com")
---
--- Or you can just use the validation functions directly:
+-- If you want to work with the validation functions directly we
+-- recommend 'Applicative' syntax:
 --
 -- >>> :{
 --  Addy.emailAddr
 --    <$> Addy.validateLocalPart "pjones"
 --    <*> Addy.validateDomainName "devalot.com"
 -- :}
--- Success (EmailAddr {
---   displayName = Nothing,
---   localPart = "pjones",
---   domain = Domain "devalot.com",
---   comments = []})
+-- Success (EmailAddr "pjones@devalot.com")
+--
+-- Prisms for the @newtype@ wrappers are provided if you want to use optics:
+--
+-- >>> :{
+--  Addy.emailAddr
+--    <$> "pjones" ^? Addy._LocalPart
+--    <*> "devalot.com" ^? Addy._DomainName
+-- :}
+-- Just (EmailAddr "pjones@devalot.com")
+--
+-- == Optics
+--
+-- Lens and prisms are provided to make working with email addresses easier:
+--
+-- > import qualified Addy
+-- > import Control.Lens
+--
+-- >>> Addy.decode "example@example.com" ^? _Right . Addy.domain
+-- Just (Domain (DomainName "example.com"))
+--
+-- >>> Addy.decode "example@example.com"
+--   ^? _Right . Addy.domain . Addy._Domain . Addy._HostNames
+-- Just [HostName "example",HostName "com"]
+--
+-- >>> Addy.decode "example@example.com"
+--   ^.. _Right . Addy.domain . Addy._Domain
+--   . Addy._HostNames . traversed . re _HostName
+-- ["example","com"]
+--
+-- == A word about address literals
+--
+-- Believe it or not, this is a completely valid email address:
+--
+-- >>> Addy.decode "example@[what's my domain name?]"
+--   ^? _Right . Addy.domain
+-- Just (DomainLiteral (AddressLiteral (Literal "what's my domain name?")))
+--
+-- If you're working with email messages it might be useful to capture
+-- these address literals, especially if you know how to interpret
+-- them.  However, if you're validating user input you probably don't
+-- want to allow these.
+--
+-- >>> Addy.decode "e@[127.0.0.1]" ^? _Right
+--   >>= failover (Addy.domain . Addy._Domain) id
+-- Nothing
+--
+-- >>> Addy.decode "example@example.com" ^? _Right
+--   >>= failover (Addy.domain . Addy._Domain) id
+-- Just (EmailAddr "example@example.com")

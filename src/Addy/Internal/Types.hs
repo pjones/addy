@@ -50,7 +50,9 @@ where
 
 import Control.Lens (Iso', Lens', Prism', iso, lens, prism')
 import qualified Data.Text as Text
+import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import Net.IP (IP)
+import Text.Show (Show (..), showParen, showString)
 
 -- | Potential validation errors.
 --
@@ -86,7 +88,6 @@ data EmailAddr = EmailAddr
     _domain :: Domain,
     _comments :: [Comment]
   }
-  deriving (Show)
 
 -- | Optional display name.  Addresses in the @name-addr@ format
 -- from RFC 5322 allow descriptive text to precede the address.
@@ -130,7 +131,8 @@ comments = lens _comments (\e cs -> e {_comments = cs})
 newtype DisplayName = DP
   { displayNameText :: Text
   }
-  deriving newtype (Show, Eq, Semigroup)
+  deriving newtype (Eq, Semigroup)
+  deriving (Show) via RenamedShow "DisplayName" Text
 
 -- | The name of the mailbox on the associated 'Domain'.
 --
@@ -138,7 +140,8 @@ newtype DisplayName = DP
 newtype LocalPart = LP
   { localPartText :: Text
   }
-  deriving newtype (Show, Eq, Semigroup)
+  deriving newtype (Eq, Semigroup)
+  deriving (Show) via RenamedShow "LocalPart" Text
 
 -- | A fully-qualified domain name /or/ an address literal.
 --
@@ -182,7 +185,8 @@ _DomainLiteral =
 newtype DomainName = DN
   { domainNameText :: Text
   }
-  deriving newtype (Show, Eq, Semigroup)
+  deriving newtype (Eq, Semigroup)
+  deriving (Show) via RenamedShow "DomainName" Text
 
 -- | The name of one host component of a domain name.
 --
@@ -190,7 +194,8 @@ newtype DomainName = DN
 newtype HostName = HN
   { hostNameText :: Text
   }
-  deriving newtype (Show, Eq, Semigroup)
+  deriving newtype (Eq, Semigroup)
+  deriving (Show) via RenamedShow "HostName" Text
 
 -- | Iso for converting between domain names and a list of host names.
 --
@@ -281,7 +286,8 @@ _AddressLiteral =
 newtype AddressTag = AT
   { addressTagText :: Text
   }
-  deriving newtype (Show, Eq, Semigroup)
+  deriving newtype (Eq, Semigroup)
+  deriving (Show) via RenamedShow "AddressTag" Text
 
 -- | A literal address that can be used with a 'TaggedAddressLiteral'
 -- or 'AddressLiteral'.
@@ -290,7 +296,8 @@ newtype AddressTag = AT
 newtype Literal = Lit
   { literalText :: Text
   }
-  deriving newtype (Show, Eq, Semigroup)
+  deriving newtype (Eq, Semigroup)
+  deriving (Show) via RenamedShow "Literal" Text
 
 -- | A comment which may appear in an email address in a specific
 -- location.
@@ -349,4 +356,15 @@ data CommentLoc
 newtype CommentContent = CC
   { commentContentText :: Text
   }
-  deriving newtype (Show, Eq, Semigroup)
+  deriving newtype (Eq, Semigroup)
+  deriving (Show) via RenamedShow "CommentContent" Text
+
+-- | Newtype wrapper for deriving 'Show' instances that lie about the
+-- name of the constructor.
+newtype RenamedShow (n :: Symbol) a = RS a
+
+instance (Show a, KnownSymbol n) => Show (RenamedShow n a) where
+  showsPrec d (RS x) =
+    showParen (d > 10) $
+      showString (symbolVal (Proxy :: Proxy n) <> " ")
+        . showsPrec d x

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 -- |
 --
 -- Copyright:
@@ -29,6 +31,8 @@ import Addy.Internal.Types
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy.Builder as TB
 import qualified Net.IP as IP
+import Text.Show (Show (..), showParen, showString)
+import Prelude hiding (show)
 
 -- | Render mode.
 --
@@ -175,3 +179,9 @@ mustQuoteLocalPart name =
     || Text.isSuffixOf "." name
     || Text.isInfixOf ".." name
     || Text.null name -- Yes, this is totally legit.
+
+-- Orphan instance that renders the email address.
+instance Show EmailAddr where
+  showsPrec d addr =
+    showParen (d > 10) $
+      showString "EmailAddr " . showsPrec d (render Full addr)

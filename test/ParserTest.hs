@@ -18,6 +18,7 @@ module ParserTest
 where
 
 import Addy.Internal.Parser as P
+import Addy.Internal.Render ()
 import Addy.Internal.Types
 import qualified Hedgehog
 import Test.Tasty (TestTree, testGroup)

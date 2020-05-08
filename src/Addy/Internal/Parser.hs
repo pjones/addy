@@ -504,26 +504,40 @@ addressLiteral mode =
       [ IpAddressLiteral . IP.fromIPv6 <$> (Atto.string "IPv6:" *> IP6.parser),
         TaggedAddressLiteral <$> tag <*> (Atto.char ':' *> lit),
         IpAddressLiteral . IP.fromIPv4 <$> IP4.parser,
-        AddressLiteral . Lit . foldMap coerce <$> many ((<>) <$> fws' <*> lit)
+        AddressLiteral <$> lit
       ]
   where
+    wrap :: Atto.Parser a -> Atto.Parser a
     wrap p =
       Atto.char '['
         *> p
         <* optional (fws mode)
         <* Atto.char ']'
+    tag :: Atto.Parser AddressTag
     tag = Atto.takeWhile1 (\c -> c /= ':' && dtext c) <&> AT
+    lit :: Atto.Parser Literal
     lit =
+      Lit . mconcat
+        <$> many
+          ( do
+              f0 <- fws'
+              ts <- dtextP
+              f1 <- fws'
+              pure (f0 <> ts <> f1)
+          )
+    dtextP :: Atto.Parser Text
+    dtextP =
       case mode of
         Strict ->
-          Atto.takeWhile1 dtext <&> Lit
+          Atto.takeWhile1 dtext
         Lenient ->
           -- Allow obsolete syntax, but don't capture it.
-          Lit . mconcat
+          mconcat
             <$> Atto.many1
               ( ( Atto.takeWhile1 (\c -> dtext c || obsNoWsCtl c)
                     <&> Text.filter (not . obsNoWsCtl)
                 )
                   <|> (quotedPairP mode $> one '-')
               )
-    fws' = (fws mode $> Lit " ") <|> pure (Lit " ")
+    fws' :: Atto.Parser Text
+    fws' = fws mode $> one ' ' <|> pure mempty
