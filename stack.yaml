@@ -1,8 +1,0 @@
-resolver: lts-15.11
-packages:
-  - .
-extra-deps:
-  - validation-selective-0.1.0.0@sha256:e02444f8f5ea82c0b63eaba3d7cc5b04d7ff953e46e7486b199a4e16ad881d49,3573
-
-# Note to self, do a stack build via:
-# stack --nix --nix-packages icu --system-ghc --no-install-ghc build
