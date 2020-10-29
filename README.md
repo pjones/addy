@@ -1,7 +1,7 @@
 Addy: a modern library for working with email addresses
 =======================================================
-
-[![addy](https://circleci.com/gh/pjones/addy.svg?style=shield)](https://app.circleci.com/github/pjones/addy/pipelines)
+[![CI](https://github.com/pjones/addy/workflows/CI/badge.svg)](https://github.com/pjones/addy/actions)
+[![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/pjones/addy?label=release)](https://github.com/pjones/addy/releases)
 [![Hackage](https://img.shields.io/hackage/v/addy?logo=haskell)](https://hackage.haskell.org/package/addy)
 [![GitHub](https://img.shields.io/github/license/pjones/addy)](https://github.com/pjones/addy/blob/master/LICENSE)
 
