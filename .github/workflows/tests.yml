@@ -22,6 +22,16 @@ jobs:
       - name: Clone Repository
         uses: actions/checkout@v2
 
+      - name: Install Windows Dependencies
+        if: matrix.os == 'windows-latest'
+        run: dotnet add package Icu4c.Win.Full.Lib --version 59.1.15
+
+      - name: Install macOS Dependencies
+        if: matrix.os == 'macOS-latest'
+        run: |
+          brew install icu4c
+          brew link icu4c --force
+
       - name: Setup Haskell
         id: setup-haskell-cabal
         uses: actions/setup-haskell@v1.1.3
