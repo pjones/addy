@@ -8,19 +8,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macOS-latest]
+        os: [ubuntu-latest]
         cabal: ["3.2"]
         ghc: ["8.6.5", "8.8.4", "8.10.2"]
     steps:
       - name: Clone Repository
         uses: actions/checkout@v2
-
-      - name: Install macOS Dependencies
-        if: matrix.os == 'macOS-latest'
-        run: |
-          echo 'LDFLAGS="-L/usr/local/opt/icu4c/lib"' >> $GITHUB_ENV
-          echo 'CPPFLAGS="-I/usr/local/opt/icu4c/include"' >> $GITHUB_ENV
-          echo 'PKG_CONFIG_PATH="/usr/local/opt/icu4c/lib/pkgconfig"' >> $GITHUB_ENV
 
       - name: Setup Haskell
         id: setup-haskell-cabal
