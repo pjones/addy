@@ -8,29 +8,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
+        os: [ubuntu-latest, macOS-latest]
         cabal: ["3.2"]
         ghc: ["8.6.5", "8.8.4", "8.10.2"]
-        # Newer versions of GHC are broken on Windows:
-        # https://gitlab.haskell.org/ghc/ghc/-/issues/17926
-        exclude:
-          - os: windows-latest
-            ghc: "8.8.4"
-          - os: windows-latest
-            ghc: "8.10.2"
     steps:
       - name: Clone Repository
         uses: actions/checkout@v2
 
-      - name: Install Windows Dependencies
-        if: matrix.os == 'windows-latest'
-        run: dotnet add package Icu4c.Win.Full.Lib --version 59.1.15
-
       - name: Install macOS Dependencies
         if: matrix.os == 'macOS-latest'
         run: |
-          brew install icu4c
-          brew link icu4c --force
+          echo 'LDFLAGS="-L/usr/local/opt/icu4c/lib"' >> $GITHUB_ENV
+          echo 'CPPFLAGS="-I/usr/local/opt/icu4c/include"' >> $GITHUB_ENV
+          echo 'PKG_CONFIG_PATH="/usr/local/opt/icu4c/lib/pkgconfig"' >> $GITHUB_ENV
 
       - name: Setup Haskell
         id: setup-haskell-cabal
