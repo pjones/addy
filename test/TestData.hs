@@ -229,7 +229,7 @@ allowedChar c = isAscii c || utf8NonAscii c
 unicode :: Gen Char
 unicode =
   Gen.frequency
-    [ (55296, Gen.element "!#$%&'*+-/=?^_`{|}~"),
+    [ (55296, Gen.element ("!#$%&'*+-/=?^_`{|}~" :: String)),
       (55296, Gen.alphaNum),
       (8190, Gen.filter isPrint (Gen.enum (chr 0xc2) maxBound))
     ]
