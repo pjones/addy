@@ -9,7 +9,7 @@ copyright:          Copyright (c) 2019-2020 Peter Jones
 homepage:           https://github.com/pjones/addy
 bug-reports:        https://github.com/pjones/addy/issues
 category:           Text
-tested-with:        GHC ==8.6.5 || ==8.8.4 || ==8.10.2
+tested-with:        GHC ==9.4.8 || ==9.6.7 || ==9.8.4 || ==9.10.2
 build-type:         Simple
 synopsis:
   A full-featured library for parsing, validating, and rendering email addresses
@@ -71,15 +71,15 @@ common options
 --------------------------------------------------------------------------------
 common dependencies
   build-depends:
-    , attoparsec            ^>=0.13
-    , base                  >=4.9   && <5.0
-    , bytestring            >=0.10  && <0.12
-    , ip                    >=1.5.1 && <1.8
-    , lens                  >=4.17  && <5.0
-    , relude                >=0.6   && <0.8
-    , text                  ^>=1.2
-    , text-icu              ^>=0.7
-    , validation-selective  ^>=0.1
+    , attoparsec            >=0.13    && <0.15
+    , base                  >=4.9     && <5.0
+    , bytestring            >=0.10    && <0.13
+    , ip                    >=1.5.1   && <1.8
+    , lens                  >=4.17    && <5.4
+    , relude                >=0.6     && <2.0
+    , text                  >=1.2     && <3.0
+    , text-icu              >=0.7     && <0.9
+    , validation-selective  >=0.1.0.0 && <0.3
 
   mixins:
     base hiding (Prelude),
@@ -111,11 +111,11 @@ test-suite test
   build-depends:
     , addy
     , aeson           >=1.4
-    , hedgehog        ^>=1.0
+    , hedgehog        >=1.0  && <2.0
     , http-types      >=0.12
     , tasty           >=1.1  && <1.5
-    , tasty-hedgehog  ^>=1.0
-    , tasty-hunit     ^>=0.10
+    , tasty-hedgehog  >=1.0  && <1.5
+    , tasty-hunit     >=0.10 && <0.11
 
 --------------------------------------------------------------------------------
 -- test-suite doctests
