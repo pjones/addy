@@ -78,7 +78,7 @@ common dependencies
     , lens                  >=4.17    && <5.4
     , relude                >=0.6     && <2.0
     , text                  >=1.2     && <3.0
-    , text-icu              >=0.7     && <0.9
+    , unicode-transforms    >=0.4.0.1 && <0.5
     , validation-selective  >=0.1.0.0 && <0.3
 
   mixins:

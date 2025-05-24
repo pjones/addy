@@ -33,7 +33,7 @@ import Addy.Internal.Types
 import qualified Data.ByteString as ByteString
 import qualified Data.Text as Text
 
-import Data.Text.ICU.Normalize2 (nfc)
+import Data.Text.Normalize (NormalizationMode(..), normalize)
 import Validation
 
 -- | Validate a single host name.  Each host name in a domain name
@@ -60,7 +60,7 @@ import Validation
 -- @since 0.1.0.0
 validateHostName :: Text -> Validation (NonEmpty Error) HostName
 validateHostName content =
-  let content' = Text.toLower $ nfc content
+  let content' = Text.toLower $ normalize NFC content
    in HN content'
         <$ ( validateNotPrefix "-" content'
                *> validateNotSuffix "-" content'
@@ -103,7 +103,7 @@ validateDomainName name =
 validateLocalPart ::
   Text -> Validation (NonEmpty Error) LocalPart
 validateLocalPart content =
-  let content' = nfc content
+  let content' = normalize NFC content
    in LP content'
         <$ ( validateLength 1 64 content'
                *> validateAllowedChars allowedChar content'
