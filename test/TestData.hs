@@ -54,9 +54,12 @@ data IsEmailCat
 isEmailTests :: IO [(IsEmailTest, IsEmailCat)]
 isEmailTests = do
   let fileName = "test/isemail.json"
-  tests <- (Aeson.decode <$> readFileLBS fileName) >>= \case
-    Nothing -> assertFailure "failed to load the isemail.json file"
-    Just ts -> pure ts
+  tests <- readFileLBS fileName
+      >>=
+        (\case
+           Nothing -> assertFailure "failed to load the isemail.json file"
+           Just ts -> pure ts)
+          . Aeson.decode
   pure $ map (\t -> (decodeAddr t, decodeCat t)) tests
 
 -- | The XSL file URL-encodes the email addresses.  Additionally, the
