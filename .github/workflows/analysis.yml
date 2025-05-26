@@ -11,7 +11,7 @@ jobs:
 
       - name: Setup Haskell
         id: setup-haskell-cabal
-        uses: haskell-actions/setup@2
+        uses: haskell-actions/setup@v2
         with:
           ghc-version: 9.8.4
 
