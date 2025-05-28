@@ -11,6 +11,12 @@ jobs:
         os: [ubuntu-latest]
         cabal: ["3.12.1.0"]
         ghc: ["9.6.7", "9.8.4", "9.10.2"]
+        include:
+          # Test only with latest GHC on windows and macOS
+          - os: macOS-latest # arm based macos system
+            ghc: 9.10.2
+          - os: windows-latest
+            ghc: 9.10.2
     steps:
       - name: Clone Repository
         uses: actions/checkout@v4
