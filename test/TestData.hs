@@ -25,7 +25,7 @@ module TestData
   )
 where
 
-import Addy.Internal.Char (utf8NonAscii)
+import Addy.Internal.Char (utf8NonAscii, atext)
 import Data.Aeson (FromJSON)
 import qualified Data.Aeson as Aeson
 import Data.Char
@@ -200,7 +200,7 @@ genDomain =
   where
     okay :: Text -> Bool
     okay t =
-      Text.all allowedChar t
+      Text.all atext t
         && not (Text.isPrefixOf "-" t)
         && not (Text.isSuffixOf "-" t)
 
